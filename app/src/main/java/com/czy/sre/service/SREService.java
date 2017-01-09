@@ -11,6 +11,7 @@ import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -20,26 +21,30 @@ import java.util.List;
 public class SREService extends AccessibilityService {
     private static final String TAG = "SREService";
     public final String weixinPackage = "com.tencent.mm";
+    private HashMap<String, Boolean> snatched = new HashMap<>();
+    String currActivityName = "com.tencent.mm.ui.LauncherUI";
+    private String nowOpenNodeId;
 
-    @SuppressLint("NewApi")
     @Override
     public void onAccessibilityEvent(AccessibilityEvent accessibilityEvent) {
         String packageName = accessibilityEvent.getPackageName().toString();
         if (weixinPackage.equals(packageName)) {//过滤包名
-            int eventType = accessibilityEvent.getEventType();//事件类型
+            int eventType = accessibilityEvent.getEventType();
+
             switch (eventType) {
-                case AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED:
+                case AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED://通知栏收到消息
                     List<CharSequence> texts = accessibilityEvent.getText();
+                    Log.d(TAG, "texts.size() = " + texts.size() + "  ,eventType = " + accessibilityEvent.getEventType());
                     for (CharSequence charSequence : texts) {
                         String text = charSequence.toString();
-                        if (text.contains("红包")) {
+                        Log.i(TAG, "text = " + text);
+                        if (text.contains("微信红包")) {
                             //模拟打开通知栏消息
-                            if (accessibilityEvent.getParcelableData() != null &&
-                                    accessibilityEvent.getParcelableData() instanceof Notification) {
+                            if (accessibilityEvent.getParcelableData() != null && accessibilityEvent.getParcelableData() instanceof Notification) {
                                 Notification notification = (Notification) accessibilityEvent.getParcelableData();
                                 PendingIntent pendingIntent = notification.contentIntent;
                                 try {
-                                    Log.d(TAG, "收到红包");
+                                    Log.d(TAG, "通知栏 收到红包");
                                     pendingIntent.send();
                                 } catch (PendingIntent.CanceledException e) {
                                     e.printStackTrace();
@@ -48,40 +53,73 @@ public class SREService extends AccessibilityService {
                         }
                     }
                     break;
-                //第二步：监听是否进入微信红包消息界面
-                case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
-                    String className = accessibilityEvent.getClassName().toString();
-                    Log.i(TAG, "className = " + className);
-                    if (className.equals("com.tencent.mm.ui.LauncherUI")) {
+                case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED://收到消息 窗口内容变化
+
+                    Log.i(TAG, "TYPE_WINDOW_CONTENT_CHANGED  currActivityName = " + currActivityName);
+                    //监听消息列表页面内容是否变化
+//                    gotoChatting();
+
+                    //监听是否进入微信红包消息界面
+                    if (currActivityName.equals("com.tencent.mm.ui.LauncherUI")) {
                         //开始抢红包
                         getPacket();
-                        Log.d(TAG, "开始抢红包");
-                    } else if (className.equals("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI")) {
+                    } else if (currActivityName.equals("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI")) {
                         //开始打开红包
-                        openPacket();//这里只是点开了红包 还要再点一次"开"才可以打开领取红包
-                        //TODO: 2017/1/7 判断已经点过的 不要再执行 
-                        // TODO: 2017/1/7 再点一次开 领取红包
-                        
-                        Log.d(TAG, "开始打开红包");
+                        openPacket();
                     }
                     break;
+                case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
+                    currActivityName = accessibilityEvent.getClassName().toString();
+//                    Log.i(TAG, "TYPE_WINDOW_STATE_CHANGED  currActivityName = " + currActivityName);
+//                    //监听是否进入微信红包消息界面
+//                    if (currActivityName.equals("com.tencent.mm.ui.LauncherUI")) {
+//                        //开始抢红包
+//                        getPacket();
+//                    } else if (currActivityName.equals("com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI")) {
+//                        //开始打开红包
+//                        openPacket();
+//                    }
+//                    break;
             }
+
         }
-
-
     }
+
+    @SuppressLint("NewApi")
+    private void gotoChatting() {
+        if (currActivityName.equals("com.tencent.mm.ui.LauncherUI")) {
+            AccessibilityNodeInfo nodeInfo = getRootInActiveWindow();
+            if (nodeInfo != null) {
+                String child0Text = nodeInfo.getChild(0).getText().toString();
+                Log.d(TAG, "child0Text = " + child0Text);
+                List<AccessibilityNodeInfo> nodes = nodeInfo.findAccessibilityNodeInfosByText("[微信红包]");
+                if (nodes != null && nodes.size() > 0) {
+                    AccessibilityNodeInfo n = nodes.get(0);
+                    if (n != null && n.isClickable()) {
+                        n.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        Log.d(TAG, "进入聊天页面  text:" + n.getText().toString());
+                    }
+                }
+            } else
+                Log.e(TAG, "gotoChatting  getRootInActiveWindow == null");
+        }
+    }
+
 
     /**
      * 查找到
      */
     @SuppressLint("NewApi")
     private void openPacket() {
+        Log.d(TAG, "openPacket..");
         AccessibilityNodeInfo nodeInfo = getRootInActiveWindow();
         if (nodeInfo != null) {
-            List<AccessibilityNodeInfo> list = nodeInfo
-                    .findAccessibilityNodeInfosByText("抢红包");
-            for (AccessibilityNodeInfo n : list) {
-                n.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+            for (int i = 0; i < nodeInfo.getChildCount(); i++) {
+                AccessibilityNodeInfo n = nodeInfo.getChild(i);
+                if (n != null && n.isClickable()) {
+                    n.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                    Log.d(TAG, "执行打开红包第二步");
+                }
             }
         }
 
@@ -106,19 +144,25 @@ public class SREService extends AccessibilityService {
         if (info.getChildCount() == 0) {
             if (info.getText() != null) {
                 if ("领取红包".equals(info.getText().toString())) {
-                    //这里有一个问题需要注意，就是需要找到一个可以点击的View
-                    Log.i(TAG, "Click" + ",isClick:" + info.isClickable());
-                    info.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                    //领取红包这个控件不可点击 它的父类可以点击
                     AccessibilityNodeInfo parent = info.getParent();
+                    String luckyMoneyDesc = parent.getChild(0).getText().toString();
+
                     while (parent != null) {
-                        Log.i(TAG, "parent isClick:" + parent.isClickable());
                         if (parent.isClickable()) {
-                            parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                            nowOpenNodeId = parent.getViewIdResourceName();
+                            String markInfo = nowOpenNodeId+"-"+luckyMoneyDesc;
+                            if (null == snatched.get(markInfo)) {
+                                Log.d(TAG, "nowOpenNodeId = " + nowOpenNodeId);
+                                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                                snatched.put(markInfo, true);//记录 已被抢过的id
+                                Log.d(TAG, "执行打开红包第一步  parent.getViewIdResourceName() = " + parent.getViewIdResourceName());
+                            } else
+                                Log.w(TAG, "红包已被抢过了  " + nowOpenNodeId);
                             break;
                         }
                         parent = parent.getParent();
                     }
-
                 }
             }
 
@@ -148,6 +192,7 @@ public class SREService extends AccessibilityService {
         AccessibilityServiceInfo info = getServiceInfo();
         info.eventTypes = AccessibilityEvent.TYPES_ALL_MASK;
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_SPOKEN;
+        info.flags |= AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
         info.notificationTimeout = 100;
         info.packageNames = new String[]{weixinPackage};//监听微信
         setServiceInfo(info);
