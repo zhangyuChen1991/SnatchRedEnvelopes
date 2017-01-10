@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">SnatchRedEnvelopes</string>
+    <string name="app_name">微信抢红包</string>
+    <string name="app_desc">抢红包辅助软件\n 请允许打开辅助功能，以使用软件辅助抢红包</string>
 </resources>
