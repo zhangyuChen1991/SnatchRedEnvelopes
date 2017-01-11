@@ -42,6 +42,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         intent = new Intent(this, SREService.class);
         initResources();
         initView();
+        updateServiceStatus();
 
     }
 
