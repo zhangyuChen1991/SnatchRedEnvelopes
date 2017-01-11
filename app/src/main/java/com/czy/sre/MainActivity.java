@@ -65,7 +65,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 startActivity(accessibleIntent);
                 break;
             case R.id.ctr_btn://开启 关闭辅助功能
-                if(!Constants.openFunction) {//如果当前是关闭状态 开启时检测服务是否在运行 没有则启动服务
+                if (!Constants.openFunction) {//如果当前是关闭状态 开启时检测服务是否在运行 没有则启动服务
                     if (!isServiceEnabled()) {
                         startService(intent);
                     }
@@ -82,13 +82,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void updateServiceStatus() {
-        Log.d("Main","updateServiceStatus   isServiceEnabled()  = "+isServiceEnabled());
+        Log.d("Main", "updateServiceStatus   isServiceEnabled()  = " + isServiceEnabled());
         if (isServiceEnabled() && Constants.openFunction) {
             ctrlBtn.setText("关闭");
             descTv.setText("正在监听微信..");
         } else {
             ctrlBtn.setText("开启");
-            descTv.setText("抢红包功能已关闭..");
+            descTv.setText(getResources().getString(R.string.use_direction) + "\n\n当前抢红包功能未开启..");
         }
     }
 
